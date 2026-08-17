@@ -3,6 +3,14 @@ package characters;
 //   This file lives in src/characters/, so it MUST start with "package characters;".
 //   Any class that wants to use Character from another folder will need to "import" it.
 
+// Day 2 imports: List/ArrayList for the composed skill list, and our own exception types and
+// Skill interface, all of which live in other top-level packages.
+import java.util.ArrayList;
+import java.util.List;
+import skills.Skill;
+import exceptions.OutOfManaException;
+import exceptions.InvalidTargetException;
+
 /*
  * Character is the "blueprint" that every fighter in our game (heroes AND enemies) is built from.
  *
@@ -22,6 +30,13 @@ public abstract class Character {
     private int maxHealth;
     private int health;
     private int attackPower;
+
+    // ----- Day 2 additions below: composition (a Character HAS-A list of skills) -----
+    // Every Character starts with the same mana pool and an empty skill list. Nothing here
+    // changes what was already true in Day 1 — these are new fields/methods, not replacements.
+    private int maxMana = 50;
+    private int mana = 50;
+    private final List<Skill> skills = new ArrayList<>();
 
     /*
      * Constructor: special method that runs once, automatically, when a new object is created
@@ -96,5 +111,60 @@ public abstract class Character {
     // with no need to override it, because it doesn't need to differ per subclass.
     public void printStatus() {
         System.out.println(name + " - HP: " + health + "/" + maxHealth);
+    }
+
+    // ----- Day 2 additions: mana + composition (a list of Skill objects) -----
+
+    public int getMana() {
+        return mana;
+    }
+
+    public int getMaxMana() {
+        return maxMana;
+    }
+
+    /*
+     * THEORY - Composition ("has-a") vs. Inheritance ("is-a"):
+     * Day 1's attack() is baked into each subclass at compile time via inheritance/overriding —
+     * a Warrior can NEVER stop having a sword attack. addSkill() instead lets us plug a Skill
+     * object INTO a Character at runtime. A Character "has-a" list of skills; it isn't required
+     * to "be" any particular skill-granting subclass. This is more flexible: the same Fireball
+     * object could be handed to a Mage, a Warrior, or even a Goblin, and skills can be added or
+     * swapped after the object already exists.
+     */
+    public void addSkill(Skill skill) {
+        skills.add(skill);
+    }
+
+    public List<Skill> getSkills() {
+        return skills;
+    }
+
+    /*
+     * THEORY - Exceptions:
+     * "throws OutOfManaException, InvalidTargetException" in the signature is what makes these
+     * CHECKED exceptions — any caller of useSkill() is forced by the compiler to either catch
+     * them or declare them too. We validate here instead of trusting the caller, for the same
+     * reason takeDamage() clamps health: an object should keep itself in a valid state and
+     * refuse to do something impossible (cast a skill you can't afford, target someone already
+     * defeated) rather than silently doing the wrong thing or crashing.
+     */
+    public void useSkill(int skillIndex, Character target) throws OutOfManaException, InvalidTargetException {
+        if (skillIndex < 0 || skillIndex >= skills.size()) {
+            throw new InvalidTargetException(name + " has no skill at index " + skillIndex + ".");
+        }
+        if (target == null || !target.isAlive()) {
+            throw new InvalidTargetException(name + " cannot target a defeated or missing target.");
+        }
+
+        Skill skill = skills.get(skillIndex);
+        if (mana < skill.getManaCost()) {
+            throw new OutOfManaException(
+                    name + " needs " + skill.getManaCost() + " MP for " + skill.getName()
+                            + " but only has " + mana + ".");
+        }
+
+        mana -= skill.getManaCost();
+        skill.use(this, target);
     }
 }
